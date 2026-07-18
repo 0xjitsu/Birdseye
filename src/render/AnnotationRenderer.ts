@@ -1,5 +1,5 @@
 import { NativeModules, Platform, UIManager } from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { TaskStep } from "../data/packs";
 import { ARRenderer } from "./ARRenderer";
@@ -95,5 +95,8 @@ export function useSpatialRenderer(): AnnotationRenderer {
     };
   }, []);
 
-  return pickRenderer(capabilities);
+  return useMemo(
+    () => pickRenderer(capabilities),
+    [capabilities.arSupported, capabilities.homographySupported],
+  );
 }
