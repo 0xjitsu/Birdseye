@@ -1,172 +1,68 @@
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
 
-import { getCachedCranePlan } from "./src/features/lesson/lib/cached-crane-plan";
-import type { LessonPlan } from "./src/features/lesson/lib/plan";
-import { GuidedLesson } from "./src/features/lesson/components/GuidedLesson";
-import { LiveGoalEntry } from "./src/features/live-goals/client";
-import { getLiveLessonPlan } from "./src/features/planner/api-client/get-live-lesson-plan";
+import { Collection } from "./src/components/Collection";
+import { DoneScreen } from "./src/components/DoneScreen";
+import { GuideCamera } from "./src/components/GuideCamera";
+import { Home } from "./src/components/Home";
+import { LevelUp, type Power } from "./src/components/LevelUp";
+import { taskPacks, type TaskPack } from "./src/data/packs";
 
-const tokenServerUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-
-function unavailablePlanner(): Promise<LessonPlan> {
-  return Promise.reject(
-    new Error(
-      "the local planner is not configured. add EXPO_PUBLIC_API_URL to .env.local and restart Expo.",
-    ),
-  );
-}
+type Route =
+  | { name: "home" }
+  | { name: "guide"; pack: TaskPack; stepIndex: number; activePower?: string }
+  | { name: "level-up"; pack: TaskPack; nextStepIndex: number }
+  | { name: "done"; pack: TaskPack }
+  | { name: "collection" };
 
 export default function App() {
-  const [activePlan, setActivePlan] = useState<LessonPlan | null>(null);
+  const [route, setRoute] = useState<Route>({ name: "home" });
+  const [coins, setCoins] = useState(120);
+  const [gems, setGems] = useState(20);
+  const [xp, setXp] = useState(0);
+  const [unlockedPackIds, setUnlockedPackIds] = useState<string[]>([]);
 
-  const startCraneDemo = useCallback(() => {
-    setActivePlan(getCachedCranePlan());
-  }, []);
+  const startPack = (pack: TaskPack) => setRoute({ name: "guide", pack, stepIndex: 0 });
 
-  const returnHome = useCallback(() => {
-    setActivePlan(null);
-  }, []);
+  const advanceGuide = () => {
+    if (route.name !== "guide") return;
+    const isFinalWave = route.stepIndex === route.pack.steps.length - 1;
+    if (isFinalWave) {
+      setCoins((current) => current + 25);
+      setGems((current) => current + 5);
+      setXp((current) => current + route.pack.xp);
+      setUnlockedPackIds((current) => current.includes(route.pack.id) ? current : [...current, route.pack.id]);
+      setRoute({ name: "done", pack: route.pack });
+      return;
+    }
+    setRoute({ name: "level-up", pack: route.pack, nextStepIndex: route.stepIndex + 1 });
+  };
 
-  const getPlan = useCallback(
-    (goal: string) =>
-      tokenServerUrl
-        ? getLiveLessonPlan(goal, { baseUrl: tokenServerUrl })
-        : unavailablePlanner(),
-    [],
-  );
-
-  if (activePlan) {
-    return (
-      <>
-        <StatusBar style="light" />
-        <GuidedLesson
-          plan={activePlan}
-          tokenServerUrl={tokenServerUrl}
-          onExit={returnHome}
-        />
-      </>
-    );
-  }
+  const choosePower = (power: Power) => {
+    if (route.name !== "level-up") return;
+    setRoute({ name: "guide", pack: route.pack, stepIndex: route.nextStepIndex, activePower: power.name });
+  };
 
   return (
-    <View style={styles.screen}>
-      <StatusBar style="light" />
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>birdseye</Text>
-        <Text style={styles.title}>learn the physical step in front of you.</Text>
-        <Text style={styles.intro}>
-          camera guidance for a paper crane, a pcb, a workbench, or the next thing
-          you are trying to make.
-        </Text>
-      </View>
-
-      <View style={styles.demoCard}>
-        <Text style={styles.cardEyebrow}>reliable demo</Text>
-        <Text style={styles.cardTitle}>paper crane</Text>
-        <Text style={styles.cardCopy}>
-          a cached six-step run with voice cues and world-locked overlays.
-        </Text>
-        <Pressable
-          accessibilityLabel="Cached crane lesson"
-          accessibilityRole="button"
-          onPress={startCraneDemo}
-          style={styles.demoButton}
-        >
-          <Text style={styles.demoButtonText}>start crane lesson</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.liveCard}>
-        <Text style={styles.cardEyebrow}>live planner</Text>
-        <LiveGoalEntry getPlan={getPlan} onPlanReady={setActivePlan} />
-      </View>
-
-      <Text style={styles.safetyCopy}>
-        use this as guidance, not safety clearance for heat, blades, mains power, or
-        food allergies.
-      </Text>
-    </View>
+    <>
+      <StatusBar style={route.name === "collection" || route.name === "done" ? "dark" : "light"} />
+      {route.name === "home" ? (
+        <Home coins={coins} gems={gems} onOpenCollection={() => setRoute({ name: "collection" })} onChoosePack={startPack} packs={taskPacks} unlockedPackIds={unlockedPackIds} xp={xp} />
+      ) : null}
+      {route.name === "guide" ? (
+        <GuideCamera
+          activePower={route.activePower}
+          pack={route.pack}
+          stepIndex={route.stepIndex}
+          onAdvance={advanceGuide}
+          onExit={() => setRoute({ name: "home" })}
+        />
+      ) : null}
+      {route.name === "level-up" ? <LevelUp onPick={choosePower} totalWaves={route.pack.steps.length} wave={route.nextStepIndex} /> : null}
+      {route.name === "done" ? (
+        <DoneScreen coins={coins} gems={gems} onClaim={() => setRoute({ name: "home" })} onCollection={() => setRoute({ name: "collection" })} pack={route.pack} />
+      ) : null}
+      {route.name === "collection" ? <Collection onBack={() => setRoute({ name: "home" })} onChoosePack={startPack} packs={taskPacks} unlockedPackIds={unlockedPackIds} /> : null}
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: "#081018",
-    flex: 1,
-    gap: 18,
-    justifyContent: "center",
-    padding: 24,
-  },
-  header: {
-    gap: 9,
-  },
-  eyebrow: {
-    color: "#d8ff69",
-    fontSize: 14,
-    fontWeight: "800",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
-  },
-  title: {
-    color: "#ffffff",
-    fontSize: 34,
-    fontWeight: "800",
-    letterSpacing: -0.8,
-    lineHeight: 40,
-  },
-  intro: {
-    color: "#c5d0dd",
-    fontSize: 16,
-    lineHeight: 23,
-  },
-  demoCard: {
-    backgroundColor: "#d8ff69",
-    borderRadius: 24,
-    gap: 9,
-    padding: 20,
-  },
-  liveCard: {
-    backgroundColor: "#f3f7fa",
-    borderRadius: 24,
-    gap: 9,
-    padding: 20,
-  },
-  cardEyebrow: {
-    color: "#475467",
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  cardTitle: {
-    color: "#102109",
-    fontSize: 26,
-    fontWeight: "800",
-  },
-  cardCopy: {
-    color: "#32412a",
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  demoButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "#102109",
-    borderRadius: 12,
-    marginTop: 5,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-  },
-  demoButtonText: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  safetyCopy: {
-    color: "#98a2b3",
-    fontSize: 12,
-    lineHeight: 18,
-  },
-});

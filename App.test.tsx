@@ -2,44 +2,50 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import App from "./App";
 
-jest.mock("react-native-webrtc", () => ({
-  mediaDevices: {},
-  RTCPeerConnection: jest.fn(),
-  registerGlobals: jest.fn(),
-}));
-
-jest.mock("expo-speech", () => ({
-  speak: jest.fn(),
-  stop: jest.fn(),
-}));
-
-jest.mock("./src/features/camera/components/CameraStage", () => {
+jest.mock("./src/components/GuideCamera", () => {
   const React = require("react");
-  const { View } = require("react-native");
+  const { Pressable, Text, View } = require("react-native");
 
   return {
-    CameraStage: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(View, null, children),
-  };
-});
-
-jest.mock("./src/features/spatial/components/SpatialOverlay", () => {
-  const React = require("react");
-  const { View } = require("react-native");
-
-  return {
-    SpatialOverlay: () => React.createElement(View),
+    GuideCamera: ({ onAdvance, pack }: { onAdvance(): void; pack: { title: string } }) =>
+      React.createElement(
+        View,
+        { accessibilityLabel: `Guide for ${pack.title}` },
+        React.createElement(Text, null, pack.title),
+        React.createElement(
+          Pressable,
+          {
+            accessibilityLabel: "Finish test guide",
+            accessibilityRole: "button",
+            onPress: onAdvance,
+          },
+          React.createElement(Text, null, "finish"),
+        ),
+      ),
   };
 });
 
 describe("Birdseye app", () => {
-  it("starts the reliable cached crane lesson through the shared guided executor", async () => {
+  it("moves from the lobby through waves, rewards, and back to the lobby", async () => {
     await render(<App />);
 
-    await fireEvent.press(screen.getByRole("button", { name: "Cached crane lesson" }));
+    expect(screen.getByText("Ori is ready\nto make something.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start Paper Crane" })).toBeTruthy();
 
-    expect(screen.getByText("Step 1 of 6")).toBeTruthy();
-    expect(screen.getByText(/Place the paper in the square/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Next step" })).toBeTruthy();
+    await fireEvent.press(screen.getByRole("button", { name: "Start Paper Crane" }));
+    expect(screen.getByLabelText("Guide for Paper Crane")).toBeTruthy();
+
+    for (let wave = 0; wave < 4; wave += 1) {
+      await fireEvent.press(screen.getByRole("button", { name: "Finish test guide" }));
+      expect(screen.getByText("LEVEL UP!")).toBeTruthy();
+      await fireEvent.press(screen.getByRole("button", { name: "Choose Precision Guide" }));
+      expect(screen.getByLabelText("Guide for Paper Crane")).toBeTruthy();
+    }
+
+    await fireEvent.press(screen.getByRole("button", { name: "Finish test guide" }));
+    expect(screen.getByText("You did it!")).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole("button", { name: "Claim rewards" }));
+    expect(screen.getByText("The Crane")).toBeTruthy();
   });
 });

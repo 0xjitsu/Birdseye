@@ -44,3 +44,4 @@ yarn-error.*
 
 # local agent handoffs
 .handoffs/
+.vercel
