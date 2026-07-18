@@ -9,7 +9,15 @@
     "ios": {
       "supportsTablet": true,
       "bitcode": false,
-      "bundleIdentifier": "com.anonymous.birdseye"
+      "bundleIdentifier": "com.ori.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Ori uses your camera to guide you through real-world tasks.",
+        "NSMicrophoneUsageDescription": "Ori uses your microphone when Voice Coach is enabled.",
+        "UIRequiredDeviceCapabilities": [
+          "armv7",
+          "arkit"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +36,7 @@
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH"
       ],
-      "package": "com.anonymous.birdseye"
+      "package": "com.ori.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -37,8 +45,9 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Ori uses the camera to place step-by-step guidance on your task.",
-          "recordAudioAndroid": false
+          "cameraPermission": "Ori uses your camera to guide you through real-world tasks.",
+          "microphonePermission": "Ori uses your microphone when Voice Coach is enabled.",
+          "recordAudioAndroid": true
         }
       ],
       [
@@ -46,7 +55,18 @@
         {
           "motionPermission": "Ori uses gentle device motion to make the fold guide feel anchored to your paper."
         }
-      ]
+      ],
+      [
+        "@reactvision/react-viro",
+        {
+          "provider": "none",
+          "ios": {
+            "cameraUsagePermission": "Ori uses your camera to guide you through real-world tasks.",
+            "microphoneUsagePermission": "Ori uses your microphone when Voice Coach is enabled."
+          }
+        }
+      ],
+      "expo-asset"
     ]
   }
 }
