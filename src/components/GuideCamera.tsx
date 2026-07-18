@@ -6,7 +6,8 @@ import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, Text, View 
 import type { TaskPack } from "../data/packs";
 import { feedbackCapture, feedbackLock, setSoundEnabled } from "../lib/feedback";
 import { speakGuideLine, stopGuideSpeech } from "../lib/speech";
-import { renderAnnotations, type SpatialPose } from "./OverlayLayer";
+import type { SpatialPose } from "../render/types";
+import { OverlayLayer } from "./OverlayLayer";
 import { OriCharacter } from "./OriCharacter";
 import { XPBar } from "./XPBar";
 import { VoiceBar } from "./VoiceBar";
@@ -27,7 +28,7 @@ export function GuideCamera({ pack, stepIndex, activePower, onAdvance, onExit }:
   const [isSoundOn, setIsSoundOn] = useState(true);
   const [locked, setLocked] = useState(() => stepIndex > 0);
   const [motionAvailable, setMotionAvailable] = useState(false);
-  const [pose, setPose] = useState<SpatialPose>({ x: 0, y: 0 });
+  const [pose, setPose] = useState<SpatialPose>({ motion: { tiltX: 0, tiltY: 0 } });
   const [captureRevision, setCaptureRevision] = useState(0);
   const [cheerLine, setCheerLine] = useState<string | null>(null);
   const [scan] = useState(() => new Animated.Value(0));
@@ -81,7 +82,12 @@ export function GuideCamera({ pack, stepIndex, activePower, onAdvance, onExit }:
           if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
           calibratedRotation.current ??= { beta, gamma };
           const initial = calibratedRotation.current;
-          setPose({ x: Math.max(-7, Math.min(7, (gamma - initial.gamma) * 12)), y: Math.max(-7, Math.min(7, (beta - initial.beta) * 12)) });
+          setPose({
+            motion: {
+              tiltX: Math.max(-7, Math.min(7, (gamma - initial.gamma) * 12)),
+              tiltY: Math.max(-7, Math.min(7, (beta - initial.beta) * 12)),
+            },
+          });
         });
       } catch {
         // The annotation remains useful without sensor access (or on desktop web).
@@ -130,7 +136,7 @@ export function GuideCamera({ pack, stepIndex, activePower, onAdvance, onExit }:
     <View style={styles.screen}>
       <CameraView facing="back" onMountError={(event) => setCameraError(event.message)} style={StyleSheet.absoluteFill} />
       <View pointerEvents="none" style={styles.vignette} />
-      {currentStep ? renderAnnotations(currentStep, pose, captureRevision, locked) : null}
+      {currentStep ? <OverlayLayer captureRevision={captureRevision} locked={locked} overlays={currentStep.overlay} pose={pose} /> : null}
       <Animated.View pointerEvents="none" style={[styles.scanLine, { opacity: locked ? 0 : 0.72, transform: [{ translateY: scan.interpolate({ inputRange: [0, 1], outputRange: [-110, 760] }) }] }]} />
       {locked ? <Animated.View pointerEvents="none" style={[styles.lockRing, { opacity: lockPing.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.85, 0] }), transform: [{ scale: lockPing.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.16] }) }] }]} /> : null}
       <Animated.View pointerEvents="none" style={[styles.captureRing, { opacity: capture.interpolate({ inputRange: [0, 0.08, 1], outputRange: [0, 0.85, 0] }), transform: [{ scale: capture.interpolate({ inputRange: [0, 1], outputRange: [0.3, 2.6] }) }] }]} />
